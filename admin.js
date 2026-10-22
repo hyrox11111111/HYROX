@@ -1,5 +1,5 @@
 import {
-  collection, doc, onSnapshot, query, orderBy, runTransaction, getDoc, setDoc
+  collection, doc, onSnapshot, query, orderBy, runTransaction, getDoc, setDoc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   signInWithEmailAndPassword, onAuthStateChanged, signOut
@@ -73,6 +73,32 @@ function render() {
     card.innerHTML = `
       <h2>${label} <span class="contador">${h ? h.ocupadas : "—"}/${cap}</span></h2>`;
 
+    if (h) {
+      // Controle de quantidade de duplas
+      const ctrl = document.createElement("div");
+      ctrl.style.cssText =
+        "display:flex;align-items:center;gap:10px;margin:-4px 0 12px;font-size:14px;";
+      const lbl = document.createElement("span");
+      lbl.className = "muted";
+      lbl.textContent = "Duplas:";
+      const menos = document.createElement("button");
+      const mais = document.createElement("button");
+      const qtd = document.createElement("strong");
+      qtd.textContent = cap / 2;
+      qtd.style.cssText = "min-width:24px;text-align:center;font-size:18px;";
+      [menos, mais].forEach((b) => {
+        b.className = "btn-ghost";
+        b.style.cssText =
+          "width:34px;height:34px;padding:0;border-radius:8px;cursor:pointer;font-size:18px;background:transparent;color:inherit;border:1px solid #2a2a2e;";
+      });
+      menos.textContent = "−";
+      mais.textContent = "+";
+      menos.addEventListener("click", () => mudarCapacidade(id, cap - 2, h.ocupadas || 0));
+      mais.addEventListener("click", () => mudarCapacidade(id, cap + 2, h.ocupadas || 0));
+      ctrl.append(lbl, menos, qtd, mais);
+      card.appendChild(ctrl);
+    }
+
     if (!h) {
       const aviso = document.createElement("p");
       aviso.className = "erro small";
@@ -111,6 +137,21 @@ function render() {
   });
 }
 
+// ---------- Mudar quantidade de duplas ----------
+async function mudarCapacidade(id, novaCap, ocupadas) {
+  if (novaCap < 2) return;
+  if (novaCap < ocupadas) {
+    alert(`Já existem ${ocupadas / 2} duplas agendadas nesse horário. Exclua alguma antes de diminuir.`);
+    return;
+  }
+  try {
+    await updateDoc(doc(db, "horarios", id), { capacidade: novaCap });
+  } catch (e) {
+    console.error(e);
+    alert("Não foi possível alterar: " + (e.code || e.message));
+  }
+}
+
 // ---------- Excluir (libera as 2 vagas) ----------
 async function excluir(r) {
   if (!confirm(`Excluir a dupla ${r.atleta1} & ${r.atleta2}?`)) return;
@@ -133,17 +174,22 @@ async function excluir(r) {
 // ---------- Criar horários (rodar uma vez) ----------
 $("btn-init").addEventListener("click", async () => {
   const criados = [];
-  for (const { id } of EVENTO.horarios) {
-    const ref = doc(db, "horarios", id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, { ocupadas: 0, capacidade: EVENTO.capacidadePorHorario });
-      criados.push(id);
+  try {
+    for (const { id } of EVENTO.horarios) {
+      const ref = doc(db, "horarios", id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        await setDoc(ref, { ocupadas: 0, capacidade: EVENTO.capacidadePorHorario });
+        criados.push(id);
+      }
     }
+    $("msg-admin").textContent = criados.length
+      ? `Horários criados: ${criados.join(", ")}`
+      : "Todos os horários já existem.";
+  } catch (e) {
+    console.error(e);
+    $("msg-admin").textContent = "Erro ao criar horários: " + (e.code || e.message);
   }
-  $("msg-admin").textContent = criados.length
-    ? `Horários criados: ${criados.join(", ")}`
-    : "Todos os horários já existem.";
 });
 
 // ---------- Exportar CSV (abre no Excel) ----------
