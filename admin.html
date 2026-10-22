@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Hyrox · Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container wide">
+    <header class="hero small-hero">
+      <p class="eyebrow">Painel do organizador</p>
+      <h1>HYROX · ADMIN</h1>
+    </header>
+
+    <!-- Login -->
+    <section id="tela-login" class="card">
+      <h2>Entrar</h2>
+      <form id="form-login">
+        <label>E-mail <input type="email" id="email" required /></label>
+        <label>Senha <input type="password" id="senha" required /></label>
+        <p id="erro-login" class="erro" role="alert"></p>
+        <button class="btn" type="submit">Entrar</button>
+      </form>
+    </section>
+
+    <!-- Painel -->
+    <section id="tela-painel" hidden>
+      <div class="toolbar">
+        <span id="usuario" class="muted small"></span>
+        <div class="toolbar-btns">
+          <button class="btn btn-ghost" id="btn-init">Criar/verificar horários</button>
+          <button class="btn btn-ghost" id="btn-csv">Baixar planilha (CSV)</button>
+          <button class="btn btn-ghost" id="btn-imprimir">Imprimir</button>
+          <button class="btn btn-ghost" id="btn-sair">Sair</button>
+        </div>
+      </div>
+      <p id="msg-admin" class="muted small"></p>
+      <div id="lista-admin" class="admin-grid"></div>
+    </section>
+  </main>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

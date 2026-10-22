@@ -1,228 +1,62 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HYROX · Praça Evolution Cross Training</title>
-<meta name="description" content="Confirme sua dupla no treino HYROX da Praça Evolution Cross Training.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#0b0b0c; --card:#151517; --line:#2a2a2e; --text:#f4f4f5; --muted:#9a9aa3;
-    --accent:#ffd400; --accent-ink:#0b0b0c; --ok:#22c55e; --err:#ef4444;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;line-height:1.45}
-  .wrap{max-width:720px;margin:0 auto;padding:28px 16px 64px}
-  header{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:24px}
-  .tag{display:inline-block;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:4px}
-  h1{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:clamp(48px,12vw,84px);line-height:.9;margin:14px 0 6px;letter-spacing:.01em}
-  h1 span{color:var(--accent)}
-  .local{font-size:18px;font-weight:600}
-  .info{color:var(--muted);margin-top:6px}
-  h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:26px;text-transform:uppercase;letter-spacing:.03em;margin:28px 0 12px}
-  .slots{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-  .slot{background:var(--card);border:2px solid var(--line);border-radius:10px;padding:14px;text-align:left;color:var(--text);cursor:pointer;font:inherit;transition:border-color .15s,transform .1s}
-  .slot:hover:not(:disabled){border-color:#55555c}
-  .slot:active:not(:disabled){transform:scale(.98)}
-  .slot.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
-  .slot:disabled{opacity:.45;cursor:not-allowed}
-  .hora{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:36px;line-height:1}
-  .vagas{font-size:13px;color:var(--muted);margin-top:6px}
-  .bar{height:6px;background:var(--line);border-radius:3px;margin-top:8px;overflow:hidden}
-  .bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
-  .slot.full .bar i{background:var(--err)}
-  form{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:18px}
-  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.05em}
-  label:first-child{margin-top:0}
-  input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:12px;font:inherit;font-size:16px}
-  input:focus{outline:none;border-color:var(--accent)}
-  .hint{font-size:12px;color:var(--muted);margin-top:4px}
-  button.cta{width:100%;margin-top:18px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:14px;font-family:"Barlow Condensed",sans-serif;font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;cursor:pointer}
-  button.cta:disabled{opacity:.5;cursor:wait}
-  .msg{margin-top:14px;padding:12px 14px;border-radius:8px;font-weight:500;display:none}
-  .msg.ok{display:block;background:rgba(34,197,94,.12);border:1px solid var(--ok);color:#bbf7d0}
-  .msg.err{display:block;background:rgba(239,68,68,.12);border:1px solid var(--err);color:#fecaca}
-  .lista{display:grid;gap:12px}
-  .grupo{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
-  .grupo h3{margin:0 0 8px;font-family:"Barlow Condensed",sans-serif;font-size:22px;display:flex;justify-content:space-between;align-items:baseline}
-  .grupo h3 small{font-family:Inter,sans-serif;font-size:13px;color:var(--muted);font-weight:500}
-  .grupo ol{margin:0;padding-left:22px}
-  .grupo li{padding:3px 0}
-  .vazio{color:var(--muted);font-size:14px}
-  .demo{background:#3a2f00;border:1px solid var(--accent);color:#fff3b0;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:18px}
-  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:40px}
-  @media (max-width:380px){.hora{font-size:30px}}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hyrox · Confirmação de Presença</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div class="wrap">
+  <main class="container">
+    <header class="hero">
+      <p class="eyebrow" id="local">Praça Evolution Cross Training</p>
+      <h1 id="nome-evento">HYROX</h1>
+      <p class="data" id="data-evento"></p>
+      <p class="sub">Treino em dupla · escolha seu horário e confirme a presença</p>
+    </header>
 
-  <div id="demo" class="demo" hidden>
-    <b>Modo de teste:</b> o Firebase ainda não foi configurado. As reservas ficam só neste navegador.
-  </div>
+    <!-- Passo 1: horário -->
+    <section class="card">
+      <h2><span class="num">1</span> Escolha o horário</h2>
+      <div id="horarios" class="horarios">
+        <p class="muted">Carregando horários…</p>
+      </div>
+    </section>
 
-  <header>
-    <span class="tag">Treino em dupla</span>
-    <h1>HYR<span>O</span>X</h1>
-    <div class="local">Praça Evolution Cross Training</div>
-    <div class="info" id="data-evento"></div>
-  </header>
+    <!-- Passo 2: dupla -->
+    <section class="card">
+      <h2><span class="num">2</span> Dados da dupla</h2>
+      <form id="form-reserva" novalidate>
+        <label>
+          Atleta 1 — nome completo
+          <input type="text" id="atleta1" maxlength="60" autocomplete="off" required />
+        </label>
+        <label>
+          Atleta 2 — nome completo
+          <input type="text" id="atleta2" maxlength="60" autocomplete="off" required />
+        </label>
 
-  <h2>1. Escolha o horário</h2>
-  <div class="slots" id="slots"></div>
+        <p id="resumo" class="resumo muted">Selecione um horário acima.</p>
+        <p id="erro" class="erro" role="alert"></p>
 
-  <h2>2. Confirme a dupla</h2>
-  <form id="form" autocomplete="off">
-    <label for="a1">Atleta 1</label>
-    <input id="a1" required minlength="2" maxlength="80" placeholder="Nome e sobrenome">
-    <label for="a2">Atleta 2</label>
-    <input id="a2" required minlength="2" maxlength="80" placeholder="Nome e sobrenome">
-    <button class="cta" id="btn" type="submit">Reservar horário</button>
-    <div class="msg" id="msg" role="status"></div>
-  </form>
+        <button type="submit" id="btn-reservar" class="btn" disabled>Confirmar presença</button>
+      </form>
+    </section>
 
-  <h2>Duplas confirmadas</h2>
-  <div class="lista" id="lista"></div>
+    <!-- Confirmação -->
+    <section id="confirmacao" class="card confirmacao" hidden>
+      <div class="check">✓</div>
+      <h2>Presença confirmada!</h2>
+      <p id="conf-texto"></p>
+      <p class="muted small">Tire um print desta tela como comprovante.</p>
+      <button class="btn btn-ghost" id="btn-nova">Fazer outra reserva</button>
+    </section>
 
-  <footer>Dúvidas? Fale com a equipe da Praça Evolution.</footer>
-</div>
+    <footer class="rodape">Cada reserva ocupa 2 vagas (1 dupla).</footer>
+  </main>
 
-<script type="module">
-/* ===================== CONFIGURAÇÃO ===================== */
-// Firebase Console > Configurações do projeto > Seus apps > Web (</>) > copie o firebaseConfig
-const firebaseConfig = {
-  apiKey: "AIzaSyCE2w_eCfkZvRImBzj9eSePmNekN4JK8UY",
-  authDomain: "hyrox-749a6.firebaseapp.com",
-  projectId: "hyrox-749a6",
-  storageBucket: "hyrox-749a6.firebasestorage.app",
-  messagingSenderId: "191560500597",
-  appId: "1:191560500597:web:e2af1ecde64d11a7acff3c"
-};
-const DATA_EVENTO = "Domingo, 01/11 · Chegue 15 min antes";
-const HORARIOS = ["0600", "0700", "0800", "0900"];
-const MAX_DUPLAS = 8;   // 16 atletas por horário
-/* ======================================================== */
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, doc, onSnapshot, runTransaction }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-const DEMO = firebaseConfig.apiKey.startsWith("COLE");
-let db = null;
-let duplas = {};          // { "0600": [{atleta1, atleta2}, ...] }
-let selecionado = null;
-
-const $ = (id) => document.getElementById(id);
-$("data-evento").textContent = DATA_EVENTO;
-if (DEMO) $("demo").hidden = false;
-
-/* ---------- dados ---------- */
-function carregarDemo() {
-  try { duplas = JSON.parse(localStorage.getItem("hyrox-demo") || "{}"); } catch { duplas = {}; }
-}
-
-function ouvir() {
-  if (DEMO) { carregarDemo(); render(); return; }
-  db = getFirestore(initializeApp(firebaseConfig));
-  onSnapshot(collection(db, "horarios"), (snap) => {
-    duplas = {};
-    snap.forEach((d) => (duplas[d.id] = d.data().duplas || []));
-    render();
-  }, () => mostrar("err", "Não foi possível carregar as vagas. Atualize a página."));
-}
-
-async function reservar(h, a1, a2) {
-  if (DEMO) {
-    carregarDemo();
-    const lista = duplas[h] || [];
-    if (lista.length >= MAX_DUPLAS) throw new Error("LOTADO");
-    duplas[h] = [...lista, { atleta1: a1, atleta2: a2 }];
-    try { localStorage.setItem("hyrox-demo", JSON.stringify(duplas)); } catch {}
-    return;
-  }
-  const ref = doc(db, "horarios", h);
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    const lista = snap.exists() ? snap.data().duplas : [];
-    if (lista.length >= MAX_DUPLAS) throw new Error("LOTADO");
-    tx.set(ref, { duplas: [...lista, { atleta1: a1, atleta2: a2 }] });
-  });
-}
-
-/* ---------- tela ---------- */
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const horaCurta = (h) => h.slice(0, 2) + "h";
-const duplasEm = (h) => duplas[h] || [];
-
-function render() {
-  $("slots").innerHTML = HORARIOS.map((h) => {
-    const n = duplasEm(h).length;
-    const livres = MAX_DUPLAS - n;
-    const cheio = livres <= 0;
-    if (cheio && selecionado === h) selecionado = null;
-    return `<button type="button" class="slot ${cheio ? "full" : ""} ${selecionado === h ? "sel" : ""}"
-              data-h="${h}" ${cheio ? "disabled" : ""} aria-pressed="${selecionado === h}">
-      <div class="hora">${horaCurta(h)}</div>
-      <div class="vagas">${cheio ? "Esgotado" : `${livres} ${livres === 1 ? "vaga" : "vagas"} de dupla`} · ${n * 2}/${MAX_DUPLAS * 2} atletas</div>
-      <div class="bar"><i style="width:${Math.min(n / MAX_DUPLAS, 1) * 100}%"></i></div>
-    </button>`;
-  }).join("");
-
-  $("lista").innerHTML = HORARIOS.map((h) => {
-    const d = duplasEm(h);
-    return `<div class="grupo">
-      <h3>${horaCurta(h)} <small>${d.length}/${MAX_DUPLAS} duplas</small></h3>
-      ${d.length ? `<ol>${d.map((r) => `<li>${esc(r.atleta1)} &amp; ${esc(r.atleta2)}</li>`).join("")}</ol>`
-                 : `<div class="vazio">Nenhuma dupla ainda.</div>`}
-    </div>`;
-  }).join("");
-}
-
-function mostrar(tipo, texto) {
-  const m = $("msg");
-  m.className = `msg ${tipo}`;
-  m.textContent = texto;
-}
-
-$("slots").addEventListener("click", (e) => {
-  const b = e.target.closest(".slot");
-  if (!b || b.disabled) return;
-  selecionado = b.dataset.h;
-  $("msg").className = "msg";
-  render();
-});
-
-$("form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const a1 = $("a1").value.trim().replace(/\s+/g, " ");
-  const a2 = $("a2").value.trim().replace(/\s+/g, " ");
-  if (!selecionado) return mostrar("err", "Escolha um horário no passo 1.");
-  if (a1.length < 2 || a2.length < 2) return mostrar("err", "Preencha o nome dos dois atletas.");
-
-  const btn = $("btn");
-  btn.disabled = true; btn.textContent = "Reservando...";
-  try {
-    const h = selecionado;
-    await reservar(h, a1, a2);
-    mostrar("ok", `Presença confirmada! ${a1} & ${a2} às ${horaCurta(h)}. Bom treino!`);
-    $("form").reset();
-    selecionado = null;
-  } catch (err) {
-    console.error(err);
-    mostrar("err", err.message === "LOTADO"
-      ? "Esse horário acabou de lotar. Escolha outro horário."
-      : "Não foi possível reservar agora. Tente de novo.");
-  } finally {
-    btn.disabled = false; btn.textContent = "Reservar horário";
-    render();
-  }
-});
-
-render();
-ouvir();
-</script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
