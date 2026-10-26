@@ -1,5 +1,5 @@
 import {
-  collection, doc, onSnapshot, query, orderBy, runTransaction, getDoc, setDoc, updateDoc
+  collection, doc, onSnapshot, query, orderBy, runTransaction, setDoc, updateDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   signInWithEmailAndPassword, onAuthStateChanged, signOut
@@ -16,6 +16,23 @@ let unsubs = [];
 function labelDe(id) {
   return ocupacao[id]?.label || EVENTO.horarios.find((h) => h.id === id)?.label || id;
 }
+
+// Horários existentes, em ordem de hora
+function idsOrdenados() {
+  return Object.keys(ocupacao).sort((a, b) => labelDe(a).localeCompare(labelDe(b)));
+}
+
+// Valida "6", "06:30", "7h", "0730" -> "06:30"
+function normalizarHora(txt) {
+  const m = String(txt || "").trim().match(/^(\d{1,2})[:hH]?(\d{2})?$/);
+  if (!m || +m[1] > 23 || +(m[2] || 0) > 59) return null;
+  return `${m[1].padStart(2, "0")}:${m[2] || "00"}`;
+}
+
+const estiloBtn =
+  "background:transparent;color:inherit;border:1px solid #2a2a2e;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;";
+const estiloInput =
+  "display:inline-block;width:auto;margin:0;padding:6px 8px;font-size:15px;";
 
 // ---------- Login ----------
 $("form-login").addEventListener("submit", async (e) => {
@@ -68,7 +85,28 @@ function render() {
   const grid = $("lista-admin");
   grid.innerHTML = "";
 
-  EVENTO.horarios.forEach(({ id }) => {
+  // Cartão para adicionar um novo horário
+  const novo = document.createElement("section");
+  novo.className = "card";
+  novo.innerHTML = `<h2>Novo horário</h2>`;
+  const linhaNovo = document.createElement("div");
+  linhaNovo.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;";
+  const inpNovo = document.createElement("input");
+  inpNovo.type = "time";
+  inpNovo.style.cssText = estiloInput;
+  const btnAdd = document.createElement("button");
+  btnAdd.textContent = "Adicionar horário";
+  btnAdd.style.cssText = estiloBtn;
+  btnAdd.addEventListener("click", () => adicionarHorario(inpNovo.value));
+  linhaNovo.append(inpNovo, btnAdd);
+  novo.appendChild(linhaNovo);
+  const dica = document.createElement("p");
+  dica.className = "muted small";
+  dica.textContent = `Começa com ${EVENTO.capacidadePorHorario / 2} duplas. Ajuste depois no − / +.`;
+  novo.appendChild(dica);
+  grid.appendChild(novo);
+
+  idsOrdenados().forEach((id) => {
     const label = labelDe(id);
     const lista = reservas.filter((r) => r.horario === id);
     const h = ocupacao[id];
@@ -80,13 +118,23 @@ function render() {
       <h2>${label} <span class="contador">${h ? h.ocupadas : "—"}/${cap}</span></h2>`;
 
     if (h) {
-      // Botão para alterar o horário (ex.: 06:00 -> 06:30)
-      const alterar = document.createElement("button");
-      alterar.textContent = "Alterar horário";
-      alterar.style.cssText =
-        "background:transparent;color:inherit;border:1px solid #2a2a2e;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;margin:-6px 0 12px;";
-      alterar.addEventListener("click", () => alterarHorario(id, label));
-      card.appendChild(alterar);
+      // Alterar o horário + salvar / apagar
+      const editar = document.createElement("div");
+      editar.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-4px 0 12px;";
+      const inpHora = document.createElement("input");
+      inpHora.type = "time";
+      inpHora.value = label;
+      inpHora.style.cssText = estiloInput;
+      const salvar = document.createElement("button");
+      salvar.textContent = "Salvar";
+      salvar.style.cssText = estiloBtn;
+      salvar.addEventListener("click", () => alterarHorario(id, inpHora.value));
+      const apagar = document.createElement("button");
+      apagar.textContent = "Apagar horário";
+      apagar.style.cssText = estiloBtn + "color:#ff5a5a;";
+      apagar.addEventListener("click", () => apagarHorario(id));
+      editar.append(inpHora, salvar, apagar);
+      card.appendChild(editar);
 
       // Controle de quantidade de duplas
       const ctrl = document.createElement("div");
@@ -111,13 +159,6 @@ function render() {
       mais.addEventListener("click", () => mudarCapacidade(id, cap + 2, h.ocupadas || 0));
       ctrl.append(lbl, menos, qtd, mais);
       card.appendChild(ctrl);
-    }
-
-    if (!h) {
-      const aviso = document.createElement("p");
-      aviso.className = "erro small";
-      aviso.textContent = "Horário não criado. Clique em “Criar/verificar horários”.";
-      card.appendChild(aviso);
     }
 
     if (lista.length === 0) {
@@ -149,12 +190,12 @@ function render() {
       opt0.textContent = "Mover para…";
       opt0.value = "";
       mover.appendChild(opt0);
-      EVENTO.horarios
-        .filter((o) => o.id !== id && ocupacao[o.id])
-        .forEach((o) => {
+      idsOrdenados()
+        .filter((outro) => outro !== id)
+        .forEach((outro) => {
           const op = document.createElement("option");
-          op.value = o.id;
-          op.textContent = labelDe(o.id);
+          op.value = outro;
+          op.textContent = labelDe(outro);
           mover.appendChild(op);
         });
       mover.addEventListener("change", () => {
@@ -176,21 +217,54 @@ function render() {
   });
 }
 
-// ---------- Alterar o horário de um turno ----------
-async function alterarHorario(id, atual) {
-  const novo = prompt(`Novo horário para ${atual} (formato HH:MM, ex.: 06:30):`, atual);
-  if (novo === null) return;
-  const m = novo.trim().match(/^(\d{1,2})[:hH]?(\d{2})?$/);
-  if (!m || +m[1] > 23 || +(m[2] || 0) > 59) {
-    alert("Horário inválido. Use o formato HH:MM, por exemplo 06:30.");
-    return;
+// Já existe outro horário com essa hora?
+function horaRepetida(label, ignorarId) {
+  return Object.keys(ocupacao).some((i) => i !== ignorarId && labelDe(i) === label);
+}
+
+// ---------- Adicionar horário ----------
+async function adicionarHorario(valor) {
+  const label = normalizarHora(valor);
+  if (!label) return alert("Escolha um horário válido, por exemplo 10:00.");
+  if (horaRepetida(label)) return alert(`Já existe o horário ${label}.`);
+  try {
+    await setDoc(doc(collection(db, "horarios")), {
+      label,
+      ocupadas: 0,
+      capacidade: EVENTO.capacidadePorHorario
+    });
+  } catch (e) {
+    console.error(e);
+    alert("Não foi possível adicionar: " + (e.code || e.message));
   }
-  const label = `${m[1].padStart(2, "0")}:${m[2] || "00"}`;
+}
+
+// ---------- Alterar o horário de um turno ----------
+async function alterarHorario(id, valor) {
+  const label = normalizarHora(valor);
+  if (!label) return alert("Escolha um horário válido, por exemplo 06:30.");
+  if (label === labelDe(id)) return;
+  if (horaRepetida(label, id)) return alert(`Já existe o horário ${label}.`);
   try {
     await updateDoc(doc(db, "horarios", id), { label });
   } catch (e) {
     console.error(e);
-    alert("Não foi possível alterar: " + (e.code || e.message));
+    alert("Não foi possível salvar: " + (e.code || e.message));
+  }
+}
+
+// ---------- Apagar horário (só se não tiver duplas) ----------
+async function apagarHorario(id) {
+  const qtd = reservas.filter((r) => r.horario === id).length;
+  if (qtd > 0) {
+    return alert(`O horário ${labelDe(id)} tem ${qtd} dupla(s). Mova ou exclua as duplas antes de apagar.`);
+  }
+  if (!confirm(`Apagar o horário ${labelDe(id)}?`)) return;
+  try {
+    await deleteDoc(doc(db, "horarios", id));
+  } catch (e) {
+    console.error(e);
+    alert("Não foi possível apagar: " + (e.code || e.message));
   }
 }
 
@@ -251,21 +325,21 @@ async function excluir(r) {
   }
 }
 
-// ---------- Criar horários (rodar uma vez) ----------
+// ---------- Criar horários padrão (só quando não há nenhum) ----------
 $("btn-init").addEventListener("click", async () => {
-  const criados = [];
+  if (Object.keys(ocupacao).length) {
+    $("msg-admin").textContent = "Os horários já existem. Use “Novo horário” para adicionar mais.";
+    return;
+  }
   try {
-    for (const { id } of EVENTO.horarios) {
-      const ref = doc(db, "horarios", id);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        await setDoc(ref, { ocupadas: 0, capacidade: EVENTO.capacidadePorHorario });
-        criados.push(id);
-      }
+    for (const { id, label } of EVENTO.horarios) {
+      await setDoc(doc(db, "horarios", id), {
+        label,
+        ocupadas: 0,
+        capacidade: EVENTO.capacidadePorHorario
+      });
     }
-    $("msg-admin").textContent = criados.length
-      ? `Horários criados: ${criados.join(", ")}`
-      : "Todos os horários já existem.";
+    $("msg-admin").textContent = "Horários padrão criados.";
   } catch (e) {
     console.error(e);
     $("msg-admin").textContent = "Erro ao criar horários: " + (e.code || e.message);
@@ -276,7 +350,7 @@ $("btn-init").addEventListener("click", async () => {
 $("btn-csv").addEventListener("click", () => {
   const esc = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
   const linhas = [["Horário", "Atleta 1", "Atleta 2", "Data da reserva"]];
-  EVENTO.horarios.forEach(({ id }) => {
+  idsOrdenados().forEach((id) => {
     const label = labelDe(id);
     reservas
       .filter((r) => r.horario === id)

@@ -42,6 +42,11 @@ function labelDe(id) {
   return ocupacao[id]?.label || EVENTO.horarios.find((h) => h.id === id)?.label || id;
 }
 
+// Horários existentes, em ordem de hora
+function idsOrdenados() {
+  return Object.keys(ocupacao).sort((a, b) => labelDe(a).localeCompare(labelDe(b)));
+}
+
 function vagasDe(id) {
   const h = ocupacao[id];
   if (!h) return null;
@@ -50,7 +55,12 @@ function vagasDe(id) {
 
 function renderHorarios() {
   elHorarios.innerHTML = "";
-  EVENTO.horarios.forEach(({ id }) => {
+  const ids = idsOrdenados();
+  if (!ids.length) {
+    elHorarios.innerHTML = `<p class="muted">Nenhum horário disponível no momento.</p>`;
+  }
+  if (selecionado && !ocupacao[selecionado]) selecionado = null;
+  ids.forEach((id) => {
     const label = labelDe(id);
     const vagas = vagasDe(id);
     const cap = ocupacao[id]?.capacidade ?? EVENTO.capacidadePorHorario;
