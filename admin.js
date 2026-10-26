@@ -12,6 +12,11 @@ let reservas = [];
 let ocupacao = {};
 let unsubs = [];
 
+// Horário exibido: o definido no painel, senão o do config.js
+function labelDe(id) {
+  return ocupacao[id]?.label || EVENTO.horarios.find((h) => h.id === id)?.label || id;
+}
+
 // ---------- Login ----------
 $("form-login").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -63,7 +68,8 @@ function render() {
   const grid = $("lista-admin");
   grid.innerHTML = "";
 
-  EVENTO.horarios.forEach(({ id, label }) => {
+  EVENTO.horarios.forEach(({ id }) => {
+    const label = labelDe(id);
     const lista = reservas.filter((r) => r.horario === id);
     const h = ocupacao[id];
     const cap = h?.capacidade ?? EVENTO.capacidadePorHorario;
@@ -74,6 +80,14 @@ function render() {
       <h2>${label} <span class="contador">${h ? h.ocupadas : "—"}/${cap}</span></h2>`;
 
     if (h) {
+      // Botão para alterar o horário (ex.: 06:00 -> 06:30)
+      const alterar = document.createElement("button");
+      alterar.textContent = "Alterar horário";
+      alterar.style.cssText =
+        "background:transparent;color:inherit;border:1px solid #2a2a2e;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;margin:-6px 0 12px;";
+      alterar.addEventListener("click", () => alterarHorario(id, label));
+      card.appendChild(alterar);
+
       // Controle de quantidade de duplas
       const ctrl = document.createElement("div");
       ctrl.style.cssText =
@@ -124,17 +138,83 @@ function render() {
       p2.className = "muted";
       info.append(p1, p2);
 
+      const acoes = document.createElement("div");
+      acoes.style.cssText = "display:flex;flex-direction:column;gap:6px;align-items:flex-end;";
+
+      // Mover a dupla para outro horário
+      const mover = document.createElement("select");
+      mover.className = "btn-excluir";
+      mover.style.cssText = "color:inherit;background:#151517;";
+      const opt0 = document.createElement("option");
+      opt0.textContent = "Mover para…";
+      opt0.value = "";
+      mover.appendChild(opt0);
+      EVENTO.horarios
+        .filter((o) => o.id !== id && ocupacao[o.id])
+        .forEach((o) => {
+          const op = document.createElement("option");
+          op.value = o.id;
+          op.textContent = labelDe(o.id);
+          mover.appendChild(op);
+        });
+      mover.addEventListener("change", () => {
+        if (mover.value) moverDupla(r, mover.value);
+        mover.value = "";
+      });
+
       const del = document.createElement("button");
       del.className = "btn-excluir";
       del.textContent = "Excluir";
       del.addEventListener("click", () => excluir(r));
 
-      linha.append(info, del);
+      acoes.append(mover, del);
+      linha.append(info, acoes);
       card.appendChild(linha);
     });
 
     grid.appendChild(card);
   });
+}
+
+// ---------- Alterar o horário de um turno ----------
+async function alterarHorario(id, atual) {
+  const novo = prompt(`Novo horário para ${atual} (formato HH:MM, ex.: 06:30):`, atual);
+  if (novo === null) return;
+  const m = novo.trim().match(/^(\d{1,2})[:hH]?(\d{2})?$/);
+  if (!m || +m[1] > 23 || +(m[2] || 0) > 59) {
+    alert("Horário inválido. Use o formato HH:MM, por exemplo 06:30.");
+    return;
+  }
+  const label = `${m[1].padStart(2, "0")}:${m[2] || "00"}`;
+  try {
+    await updateDoc(doc(db, "horarios", id), { label });
+  } catch (e) {
+    console.error(e);
+    alert("Não foi possível alterar: " + (e.code || e.message));
+  }
+}
+
+// ---------- Mover dupla para outro horário ----------
+async function moverDupla(r, destinoId) {
+  if (!confirm(`Mover ${r.atleta1} & ${r.atleta2} para ${labelDe(destinoId)}?`)) return;
+  const origemRef = doc(db, "horarios", r.horario);
+  const destinoRef = doc(db, "horarios", destinoId);
+  const reservaRef = doc(db, "reservas", r.id);
+  try {
+    await runTransaction(db, async (tx) => {
+      const o = await tx.get(origemRef);
+      const d = await tx.get(destinoRef);
+      if (!d.exists()) throw new Error("Horário de destino não existe.");
+      const dOcup = d.data().ocupadas || 0;
+      if (dOcup + 2 > d.data().capacidade) throw new Error("O horário de destino está lotado.");
+      tx.update(reservaRef, { horario: destinoId });
+      tx.update(destinoRef, { ocupadas: dOcup + 2 });
+      if (o.exists()) tx.update(origemRef, { ocupadas: Math.max(0, (o.data().ocupadas || 0) - 2) });
+    });
+  } catch (e) {
+    console.error(e);
+    alert("Não foi possível mover: " + (e.code || e.message));
+  }
 }
 
 // ---------- Mudar quantidade de duplas ----------
@@ -196,7 +276,8 @@ $("btn-init").addEventListener("click", async () => {
 $("btn-csv").addEventListener("click", () => {
   const esc = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
   const linhas = [["Horário", "Atleta 1", "Atleta 2", "Data da reserva"]];
-  EVENTO.horarios.forEach(({ id, label }) => {
+  EVENTO.horarios.forEach(({ id }) => {
+    const label = labelDe(id);
     reservas
       .filter((r) => r.horario === id)
       .forEach((r) =>
