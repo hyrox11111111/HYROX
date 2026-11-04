@@ -3,58 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hyrox · Confirmação de Presença</title>
+  <title>Ranking · Campeonato</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/png" href="logo.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="hero">
-      <p class="eyebrow" id="local">Praça Evolution Cross Training</p>
-      <h1 id="nome-evento">HYROX</h1>
-      <p class="data" id="data-evento"></p>
-      <p class="sub">Treino em dupla · escolha seu horário e confirme a presença</p>
+      <img class="logo" src="logo.png" alt="Crosstraining Evolution" width="240" />
+      <p class="eyebrow" id="modalidade"></p>
+      <h1 id="nome-evento">CAMPEONATO</h1>
+      <p class="data" id="data-evento" hidden></p>
+      <p class="sub" id="local" hidden></p>
     </header>
 
-    <!-- Passo 1: horário -->
-    <section class="card">
-      <h2><span class="num">1</span> Escolha o horário</h2>
-      <div id="horarios" class="horarios">
-        <p class="muted">Carregando horários…</p>
-      </div>
+    <p class="live"><span class="dot"></span><span id="status">Carregando…</span></p>
+
+    <div id="podio" class="pod"></div>
+
+    <section class="card lista-card">
+      <input type="search" id="busca" placeholder="Buscar atleta ou box" autocomplete="off" />
+      <div class="hd"><span>Atleta</span><span>Pontos</span></div>
+      <div id="lista"></div>
     </section>
 
-    <!-- Passo 2: dupla -->
-    <section class="card">
-      <h2><span class="num">2</span> Dados da dupla</h2>
-      <form id="form-reserva" novalidate>
-        <label>
-          Atleta 1 — nome completo
-          <input type="text" id="atleta1" maxlength="60" autocomplete="off" required />
-        </label>
-        <label>
-          Atleta 2 — nome completo
-          <input type="text" id="atleta2" maxlength="60" autocomplete="off" required />
-        </label>
-
-        <p id="resumo" class="resumo muted">Selecione um horário acima.</p>
-        <p id="erro" class="erro" role="alert"></p>
-
-        <button type="submit" id="btn-reservar" class="btn" disabled>Confirmar presença</button>
-      </form>
-    </section>
-
-    <!-- Confirmação -->
-    <section id="confirmacao" class="card confirmacao" hidden>
-      <div class="check">✓</div>
-      <h2>Presença confirmada!</h2>
-      <p id="conf-texto"></p>
-      <p class="muted small">Tire um print desta tela como comprovante.</p>
-      <button class="btn btn-ghost" id="btn-nova">Fazer outra reserva</button>
-    </section>
-
-    <footer class="rodape">Cada reserva ocupa 2 vagas (1 dupla).</footer>
+    <p class="rodape" id="regra"></p>
   </main>
 
   <script type="module" src="app.js"></script>

@@ -1,38 +1,32 @@
 import {
-  collection, doc, onSnapshot, query, orderBy, runTransaction, setDoc, updateDoc, deleteDoc
+  collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, deleteField, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   signInWithEmailAndPassword, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { db, auth } from "./firebase.js";
 import { EVENTO } from "./config.js";
+import { pontosDe, totalDe, classificar, provasLancadas } from "./ranking.js";
 
 const $ = (id) => document.getElementById(id);
-let reservas = [];
-let ocupacao = {};
+const el = (tag, cls, texto) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (texto !== undefined) e.textContent = texto;
+  return e;
+};
+
+let atletas = [];
 let unsubs = [];
-
-// Horário exibido: o definido no painel, senão o do config.js
-function labelDe(id) {
-  return ocupacao[id]?.label || EVENTO.horarios.find((h) => h.id === id)?.label || id;
-}
-
-// Horários existentes, em ordem de hora
-function idsOrdenados() {
-  return Object.keys(ocupacao).sort((a, b) => labelDe(a).localeCompare(labelDe(b)));
-}
-
-// Valida "6", "06:30", "7h", "0730" -> "06:30"
-function normalizarHora(txt) {
-  const m = String(txt || "").trim().match(/^(\d{1,2})[:hH]?(\d{2})?$/);
-  if (!m || +m[1] > 23 || +(m[2] || 0) > 59) return null;
-  return `${m[1].padStart(2, "0")}:${m[2] || "00"}`;
-}
-
-const estiloBtn =
-  "background:transparent;color:inherit;border:1px solid #2a2a2e;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;";
-const estiloInput =
-  "display:inline-block;width:auto;margin:0;padding:6px 8px;font-size:15px;";
+let filtroAdmin = "";
+const norm = (t) =>
+  String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const iniciais = (nome) => {
+  const p = String(nome || "").trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return "?";
+  return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
+};
+const cards = new Map(); // id -> { root, nome, box, total, inputs: {provaId: {input, pts}} }
 
 // ---------- Login ----------
 $("form-login").addEventListener("submit", async (e) => {
@@ -57,317 +51,217 @@ onAuthStateChanged(auth, (user) => {
   $("usuario").textContent = `Conectada como ${user.email}`;
 
   unsubs.push(
-    onSnapshot(collection(db, "horarios"), (snap) => {
-      ocupacao = {};
-      snap.forEach((d) => (ocupacao[d.id] = d.data()));
-      render();
-    })
-  );
-
-  unsubs.push(
     onSnapshot(
-      query(collection(db, "reservas"), orderBy("criadoEm", "asc")),
+      collection(db, "atletas"),
       (snap) => {
-        reservas = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        atletas = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         $("msg-admin").textContent = "";
         render();
       },
       () => {
         $("msg-admin").textContent =
-          "Sem permissão para ver as reservas. Confira se o seu e-mail está no arquivo firestore.rules.";
+          "Sem permissão para ver os atletas. Confira se o seu e-mail está nas regras do Firestore.";
       }
     )
   );
 });
 
-// ---------- Lista ----------
+// ---------- Lista (atualiza sem perder o foco dos campos) ----------
 function render() {
   const grid = $("lista-admin");
-  grid.innerHTML = "";
+  const ordenados = [...atletas].sort((a, b) =>
+    String(a.nome).localeCompare(String(b.nome), "pt-BR")
+  );
+  const ids = new Set(ordenados.map((a) => a.id));
 
-  // Cartão para adicionar um novo horário
-  const novo = document.createElement("section");
-  novo.className = "card";
-  novo.innerHTML = `<h2>Novo horário</h2>`;
-  const linhaNovo = document.createElement("div");
-  linhaNovo.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;";
-  const inpNovo = document.createElement("input");
-  inpNovo.type = "time";
-  inpNovo.style.cssText = estiloInput;
-  const btnAdd = document.createElement("button");
-  btnAdd.textContent = "Adicionar horário";
-  btnAdd.style.cssText = estiloBtn;
-  btnAdd.addEventListener("click", () => adicionarHorario(inpNovo.value));
-  linhaNovo.append(inpNovo, btnAdd);
-  novo.appendChild(linhaNovo);
-  const dica = document.createElement("p");
-  dica.className = "muted small";
-  dica.textContent = `Começa com ${EVENTO.capacidadePorHorario / 2} duplas. Ajuste depois no − / +.`;
-  novo.appendChild(dica);
-  grid.appendChild(novo);
+  for (const [id, c] of cards) {
+    if (!ids.has(id)) { c.root.remove(); cards.delete(id); }
+  }
 
-  idsOrdenados().forEach((id) => {
-    const label = labelDe(id);
-    const lista = reservas.filter((r) => r.horario === id);
-    const h = ocupacao[id];
-    const cap = h?.capacidade ?? EVENTO.capacidadePorHorario;
+  ordenados.forEach((a, i) => {
+    let c = cards.get(a.id);
+    if (!c) { c = criarCard(a.id); cards.set(a.id, c); }
+    atualizarCard(c, a);
+    if (grid.children[i] !== c.root) grid.insertBefore(c.root, grid.children[i] || null);
+  });
 
-    const card = document.createElement("section");
-    card.className = "card";
-    card.innerHTML = `
-      <h2>${label} <span class="contador">${h ? h.ocupadas : "—"}/${cap}</span></h2>`;
+  ordenados.forEach((a) => {
+    const c = cards.get(a.id);
+    const ok = !filtroAdmin || norm(a.nome).includes(filtroAdmin) || norm(a.box).includes(filtroAdmin);
+    c.root.hidden = !ok;
+  });
 
-    if (h) {
-      // Alterar o horário + salvar / apagar
-      const editar = document.createElement("div");
-      editar.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-4px 0 12px;";
-      const inpHora = document.createElement("input");
-      inpHora.type = "time";
-      inpHora.value = label;
-      inpHora.style.cssText = estiloInput;
-      const salvar = document.createElement("button");
-      salvar.textContent = "Salvar";
-      salvar.style.cssText = estiloBtn;
-      salvar.addEventListener("click", () => alterarHorario(id, inpHora.value));
-      const apagar = document.createElement("button");
-      apagar.textContent = "Apagar horário";
-      apagar.style.cssText = estiloBtn + "color:#ff5a5a;";
-      apagar.addEventListener("click", () => apagarHorario(id));
-      editar.append(inpHora, salvar, apagar);
-      card.appendChild(editar);
+  $("vazio").hidden = ordenados.length > 0;
 
-      // Controle de quantidade de duplas
-      const ctrl = document.createElement("div");
-      ctrl.style.cssText =
-        "display:flex;align-items:center;gap:10px;margin:-4px 0 12px;font-size:14px;";
-      const lbl = document.createElement("span");
-      lbl.className = "muted";
-      lbl.textContent = "Duplas:";
-      const menos = document.createElement("button");
-      const mais = document.createElement("button");
-      const qtd = document.createElement("strong");
-      qtd.textContent = cap / 2;
-      qtd.style.cssText = "min-width:24px;text-align:center;font-size:18px;";
-      [menos, mais].forEach((b) => {
-        b.className = "btn-ghost";
-        b.style.cssText =
-          "width:34px;height:34px;padding:0;border-radius:8px;cursor:pointer;font-size:18px;background:transparent;color:inherit;border:1px solid #2a2a2e;";
-      });
-      menos.textContent = "−";
-      mais.textContent = "+";
-      menos.addEventListener("click", () => mudarCapacidade(id, cap - 2, h.ocupadas || 0));
-      mais.addEventListener("click", () => mudarCapacidade(id, cap + 2, h.ocupadas || 0));
-      ctrl.append(lbl, menos, qtd, mais);
-      card.appendChild(ctrl);
-    }
+  const rank = classificar(atletas);
+  $("st-atletas").textContent = atletas.length;
+  $("st-provas").textContent = `${provasLancadas(atletas).length}/${EVENTO.provas.length}`;
+  $("st-lider").textContent =
+    rank.length && rank[0].temResultado ? String(rank[0].nome).split(" ")[0] : "—";
+}
 
-    if (lista.length === 0) {
-      const vazio = document.createElement("p");
-      vazio.className = "muted small";
-      vazio.textContent = "Nenhuma dupla ainda.";
-      card.appendChild(vazio);
-    }
+$("busca-admin").addEventListener("input", (e) => {
+  filtroAdmin = norm(e.target.value.trim());
+  render();
+});
 
-    lista.forEach((r, i) => {
-      const linha = document.createElement("div");
-      linha.className = "dupla";
-      const info = document.createElement("div");
-      const p1 = document.createElement("p");
-      p1.textContent = `${i + 1}. ${r.atleta1}`;
-      const p2 = document.createElement("p");
-      p2.textContent = `    ${r.atleta2}`;
-      p2.className = "muted";
-      info.append(p1, p2);
+function criarCard(id) {
+  const root = el("section", "card atleta");
 
-      const acoes = document.createElement("div");
-      acoes.style.cssText = "display:flex;flex-direction:column;gap:6px;align-items:flex-end;";
+  const topo = el("div", "topo-atleta");
+  const avatar = el("span", "avatar");
+  const textos = el("div", "textos");
+  const nome = el("span", "nome-atleta");
+  const box = el("span", "box-atleta");
+  textos.append(nome, box);
+  const total = el("span", "contador");
+  topo.append(avatar, textos, total);
 
-      // Mover a dupla para outro horário
-      const mover = document.createElement("select");
-      mover.className = "btn-excluir";
-      mover.style.cssText = "color:inherit;background:#151517;";
-      const opt0 = document.createElement("option");
-      opt0.textContent = "Mover para…";
-      opt0.value = "";
-      mover.appendChild(opt0);
-      idsOrdenados()
-        .filter((outro) => outro !== id)
-        .forEach((outro) => {
-          const op = document.createElement("option");
-          op.value = outro;
-          op.textContent = labelDe(outro);
-          mover.appendChild(op);
-        });
-      mover.addEventListener("change", () => {
-        if (mover.value) moverDupla(r, mover.value);
-        mover.value = "";
-      });
+  const acoes = el("div", "toolbar-btns");
+  const editar = el("button", "btn btn-ghost", "Editar");
+  editar.type = "button";
+  editar.addEventListener("click", () => editarAtleta(id));
+  const excluir = el("button", "btn-excluir", "Excluir atleta");
+  excluir.type = "button";
+  excluir.addEventListener("click", () => excluirAtleta(id));
+  acoes.append(editar, excluir);
 
-      const del = document.createElement("button");
-      del.className = "btn-excluir";
-      del.textContent = "Excluir";
-      del.addEventListener("click", () => excluir(r));
+  const grade = el("div", "posicoes");
+  const inputs = {};
+  EVENTO.provas.forEach((p) => {
+    const lab = el("label", "pos-in");
+    lab.appendChild(el("span", "", p.label));
+    const input = document.createElement("input");
+    input.type = "number";
+    input.inputMode = "numeric";
+    input.min = "1";
+    input.max = "999";
+    input.placeholder = "—";
+    input.setAttribute("aria-label", `Colocação no ${p.label}`);
+    input.addEventListener("input", () => input.classList.toggle("ok", input.value.trim() !== ""));
+    input.addEventListener("change", () => salvarPosicao(id, p.id, input));
+    const pts = el("small", "pts-prova", "");
+    lab.append(input, pts);
+    grade.appendChild(lab);
+    inputs[p.id] = { input, pts };
+  });
 
-      acoes.append(mover, del);
-      linha.append(info, acoes);
-      card.appendChild(linha);
-    });
+  root.append(topo, grade, acoes);
+  return { root, nome, box, avatar, total, inputs };
+}
 
-    grid.appendChild(card);
+function atualizarCard(c, a) {
+  c.nome.textContent = a.nome;
+  c.avatar.textContent = iniciais(a.nome);
+  c.box.textContent = a.box || "Sem box";
+  c.total.textContent = `${totalDe(a)} pts`;
+  EVENTO.provas.forEach((p) => {
+    const { input, pts } = c.inputs[p.id];
+    const v = (a.posicoes || {})[p.id];
+    if (document.activeElement !== input) input.value = Number.isInteger(v) ? v : "";
+    input.classList.toggle("ok", Number.isInteger(v));
+    pts.textContent = Number.isInteger(v) ? `${pontosDe(v)} pts` : "";
   });
 }
 
-// Já existe outro horário com essa hora?
-function horaRepetida(label, ignorarId) {
-  return Object.keys(ocupacao).some((i) => i !== ignorarId && labelDe(i) === label);
-}
-
-// ---------- Adicionar horário ----------
-async function adicionarHorario(valor) {
-  const label = normalizarHora(valor);
-  if (!label) return alert("Escolha um horário válido, por exemplo 10:00.");
-  if (horaRepetida(label)) return alert(`Já existe o horário ${label}.`);
+// ---------- Lançar colocação ----------
+async function salvarPosicao(id, provaId, input) {
+  const raw = input.value.trim();
+  const ref = doc(db, "atletas", id);
   try {
-    await setDoc(doc(collection(db, "horarios")), {
-      label,
-      ocupadas: 0,
-      capacidade: EVENTO.capacidadePorHorario
-    });
-  } catch (e) {
-    console.error(e);
-    alert("Não foi possível adicionar: " + (e.code || e.message));
-  }
-}
-
-// ---------- Alterar o horário de um turno ----------
-async function alterarHorario(id, valor) {
-  const label = normalizarHora(valor);
-  if (!label) return alert("Escolha um horário válido, por exemplo 06:30.");
-  if (label === labelDe(id)) return;
-  if (horaRepetida(label, id)) return alert(`Já existe o horário ${label}.`);
-  try {
-    await updateDoc(doc(db, "horarios", id), { label });
+    if (raw === "") {
+      await updateDoc(ref, { [`posicoes.${provaId}`]: deleteField() });
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > 999) {
+      alert("Digite a colocação como número inteiro (1 ou mais).");
+      const atual = (atletas.find((a) => a.id === id)?.posicoes || {})[provaId];
+      input.value = Number.isInteger(atual) ? atual : "";
+      return;
+    }
+    await updateDoc(ref, { [`posicoes.${provaId}`]: n });
   } catch (e) {
     console.error(e);
     alert("Não foi possível salvar: " + (e.code || e.message));
   }
 }
 
-// ---------- Apagar horário (só se não tiver duplas) ----------
-async function apagarHorario(id) {
-  const qtd = reservas.filter((r) => r.horario === id).length;
-  if (qtd > 0) {
-    return alert(`O horário ${labelDe(id)} tem ${qtd} dupla(s). Mova ou exclua as duplas antes de apagar.`);
-  }
-  if (!confirm(`Apagar o horário ${labelDe(id)}?`)) return;
+// ---------- Adicionar / editar / excluir atleta ----------
+$("form-novo").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const nome = $("novo-nome").value.trim().replace(/\s+/g, " ");
+  const box = $("novo-box").value.trim().replace(/\s+/g, " ");
+  if (!nome) return;
   try {
-    await deleteDoc(doc(db, "horarios", id));
-  } catch (e) {
-    console.error(e);
-    alert("Não foi possível apagar: " + (e.code || e.message));
-  }
-}
-
-// ---------- Mover dupla para outro horário ----------
-async function moverDupla(r, destinoId) {
-  if (!confirm(`Mover ${r.atleta1} & ${r.atleta2} para ${labelDe(destinoId)}?`)) return;
-  const origemRef = doc(db, "horarios", r.horario);
-  const destinoRef = doc(db, "horarios", destinoId);
-  const reservaRef = doc(db, "reservas", r.id);
-  try {
-    await runTransaction(db, async (tx) => {
-      const o = await tx.get(origemRef);
-      const d = await tx.get(destinoRef);
-      if (!d.exists()) throw new Error("Horário de destino não existe.");
-      const dOcup = d.data().ocupadas || 0;
-      if (dOcup + 2 > d.data().capacidade) throw new Error("O horário de destino está lotado.");
-      tx.update(reservaRef, { horario: destinoId });
-      tx.update(destinoRef, { ocupadas: dOcup + 2 });
-      if (o.exists()) tx.update(origemRef, { ocupadas: Math.max(0, (o.data().ocupadas || 0) - 2) });
+    await addDoc(collection(db, "atletas"), {
+      nome,
+      box,
+      posicoes: {},
+      criadoEm: serverTimestamp()
     });
-  } catch (e) {
-    console.error(e);
-    alert("Não foi possível mover: " + (e.code || e.message));
-  }
-}
-
-// ---------- Mudar quantidade de duplas ----------
-async function mudarCapacidade(id, novaCap, ocupadas) {
-  if (novaCap < 2) return;
-  if (novaCap < ocupadas) {
-    alert(`Já existem ${ocupadas / 2} duplas agendadas nesse horário. Exclua alguma antes de diminuir.`);
-    return;
-  }
-  try {
-    await updateDoc(doc(db, "horarios", id), { capacidade: novaCap });
-  } catch (e) {
-    console.error(e);
-    alert("Não foi possível alterar: " + (e.code || e.message));
-  }
-}
-
-// ---------- Excluir (libera as 2 vagas) ----------
-async function excluir(r) {
-  if (!confirm(`Excluir a dupla ${r.atleta1} & ${r.atleta2}?`)) return;
-  const horarioRef = doc(db, "horarios", r.horario);
-  const reservaRef = doc(db, "reservas", r.id);
-  try {
-    await runTransaction(db, async (tx) => {
-      const h = await tx.get(horarioRef);
-      tx.delete(reservaRef);
-      if (h.exists()) {
-        tx.update(horarioRef, { ocupadas: Math.max(0, (h.data().ocupadas || 0) - 2) });
-      }
-    });
-  } catch (e) {
-    console.error(e);
-    alert("Não foi possível excluir.");
-  }
-}
-
-// ---------- Criar horários padrão (só quando não há nenhum) ----------
-$("btn-init").addEventListener("click", async () => {
-  if (Object.keys(ocupacao).length) {
-    $("msg-admin").textContent = "Os horários já existem. Use “Novo horário” para adicionar mais.";
-    return;
-  }
-  try {
-    for (const { id, label } of EVENTO.horarios) {
-      await setDoc(doc(db, "horarios", id), {
-        label,
-        ocupadas: 0,
-        capacidade: EVENTO.capacidadePorHorario
-      });
-    }
-    $("msg-admin").textContent = "Horários padrão criados.";
-  } catch (e) {
-    console.error(e);
-    $("msg-admin").textContent = "Erro ao criar horários: " + (e.code || e.message);
+    $("novo-nome").value = "";
+    $("novo-box").value = "";
+    $("novo-nome").focus();
+  } catch (err) {
+    console.error(err);
+    alert("Não foi possível adicionar: " + (err.code || err.message));
   }
 });
 
+async function editarAtleta(id) {
+  const a = atletas.find((x) => x.id === id);
+  if (!a) return;
+  const nome = (prompt("Nome do atleta:", a.nome) || "").trim();
+  if (!nome) return;
+  const box = (prompt("Box (deixe vazio para nenhum):", a.box || "") ?? a.box ?? "").trim();
+  try {
+    await updateDoc(doc(db, "atletas", id), { nome, box });
+  } catch (err) {
+    console.error(err);
+    alert("Erro: " + (err.code || err.message));
+  }
+}
+
+async function excluirAtleta(id) {
+  const a = atletas.find((x) => x.id === id);
+  if (!a) return;
+  if (!confirm(`Excluir o atleta ${a.nome}? Os resultados dele também serão apagados.`)) return;
+  try {
+    await deleteDoc(doc(db, "atletas", id));
+  } catch (err) {
+    console.error(err);
+    alert("Erro: " + (err.code || err.message));
+  }
+}
+
 // ---------- Exportar CSV (abre no Excel) ----------
 $("btn-csv").addEventListener("click", () => {
-  const esc = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
-  const linhas = [["Horário", "Atleta 1", "Atleta 2", "Data da reserva"]];
-  idsOrdenados().forEach((id) => {
-    const label = labelDe(id);
-    reservas
-      .filter((r) => r.horario === id)
-      .forEach((r) =>
-        linhas.push([
-          label,
-          r.atleta1,
-          r.atleta2,
-          r.criadoEm?.toDate ? r.criadoEm.toDate().toLocaleString("pt-BR") : ""
-        ])
-      );
+  const esc = (s) => {
+    let t = String(s ?? "");
+    if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; // evita fórmulas no Excel
+    return `"${t.replace(/"/g, '""')}"`;
+  };
+  const cab = ["Posição", "Atleta", "Box", ...EVENTO.provas.map((p) => `${p.label} (colocação)`), "Total de pontos"];
+  const linhas = [cab];
+  classificar(atletas).forEach((a) => {
+    linhas.push([
+      a.temResultado ? a.rank : "",
+      a.nome,
+      a.box || "",
+      ...EVENTO.provas.map((p) => {
+        const v = (a.posicoes || {})[p.id];
+        return Number.isInteger(v) ? v : "";
+      }),
+      a.total
+    ]);
   });
-  const csv = "﻿" + linhas.map((l) => l.map(esc).join(";")).join("\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  a.download = "hyrox-duplas.csv";
-  a.click();
+  const csv = "\ufeff" + linhas.map((l) => l.map(esc).join(";")).join("\n");
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  link.download = "ranking-campeonato.csv";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 });
 
 $("btn-imprimir").addEventListener("click", () => window.print());

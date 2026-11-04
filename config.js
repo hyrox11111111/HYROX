@@ -15,15 +15,20 @@ export const firebaseConfig = {
 
 // 2) Dados do evento
 export const EVENTO = {
-  nome: "Hyrox",
-  local: "Praça Evolution Cross Training",
-  data: "Domingo, 01/11/2026",
-  capacidadePorHorario: 12,           // pessoas por horário (12 = 6 duplas)
-  horarios: [
-    // ATENÇÃO: os "id" precisam ser os mesmos do arquivo firestore.rules
-    { id: "06h", label: "06:00" },
-    { id: "07h", label: "07:00" },
-    { id: "08h", label: "08:00" },
-    { id: "09h", label: "09:00" }
-  ]
+  nome: "Campeonato",          // título grande da página
+  modalidade: "Crossfit",      // texto pequeno acima do título
+  data: "",                    // ex.: "Sábado, 14/11/2026" (deixe "" para esconder)
+  local: "Crosstraining Evolution",  // nome do box/local (deixe "" para esconder)
+
+  // Provas, na ordem em que acontecem. O WOD 3 vale 2 provas (3A e 3B).
+  provas: [
+    { id: "w1",  label: "WOD 1" },
+    { id: "w2",  label: "WOD 2" },
+    { id: "w3a", label: "WOD 3A" },
+    { id: "w3b", label: "WOD 3B" }
+  ],
+
+  // Pontuação: 1º = 100, 2º = 95, 3º = 90...
+  pontosPrimeiro: 100,
+  pontosPorPosicao: 5
 };

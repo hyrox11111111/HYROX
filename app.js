@@ -1,180 +1,139 @@
 import {
-  collection, doc, onSnapshot, runTransaction, serverTimestamp
+  collection, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { EVENTO } from "./config.js";
+import { classificar, provasLancadas } from "./ranking.js";
 
-// ---------- Elementos ----------
 const $ = (id) => document.getElementById(id);
-const elHorarios = $("horarios");
-const form = $("form-reserva");
-const inp1 = $("atleta1");
-const inp2 = $("atleta2");
-const btn = $("btn-reservar");
-const resumo = $("resumo");
-const erro = $("erro");
+const el = (tag, cls, texto) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (texto !== undefined) e.textContent = texto;
+  return e;
+};
+const iniciais = (nome) => {
+  const p = String(nome || "").trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return "?";
+  return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
+};
+const medalha = (rank) => ["ouro", "prata", "bronze"][Math.min(rank, 3) - 1];
+const norm = (s) =>
+  String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+// ---------- Cabeçalho ----------
+$("modalidade").textContent = EVENTO.modalidade;
 $("nome-evento").textContent = EVENTO.nome.toUpperCase();
-$("local").textContent = EVENTO.local;
-$("data-evento").textContent = EVENTO.data;
+document.title = `Ranking · ${EVENTO.nome}`;
+if (EVENTO.data) { $("data-evento").textContent = EVENTO.data; $("data-evento").hidden = false; }
+if (EVENTO.local) { $("local").textContent = EVENTO.local; $("local").hidden = false; }
+$("regra").textContent =
+  `1º = ${EVENTO.pontosPrimeiro} pts, −${EVENTO.pontosPorPosicao} por posição · pontos somados em ${EVENTO.provas.length} provas`;
 
-let selecionado = null;      // id do horário escolhido
-let ocupacao = {};           // { "06h": { ocupadas, capacidade } }
-let enviando = false;
+let atletas = [];
+let filtro = "";
 
-// ---------- Vagas em tempo real ----------
-// A página pública lê SOMENTE os contadores (coleção "horarios").
-// Os nomes ficam na coleção "reservas", que só o admin consegue ler.
+// ---------- Dados em tempo real ----------
 onSnapshot(
-  collection(db, "horarios"),
+  collection(db, "atletas"),
   (snap) => {
-    ocupacao = {};
-    snap.forEach((d) => (ocupacao[d.id] = d.data()));
-    renderHorarios();
+    atletas = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    render();
   },
   () => {
-    elHorarios.innerHTML = `<p class="erro">Não foi possível carregar os horários. Atualize a página.</p>`;
+    $("status").textContent = "Não foi possível carregar o ranking. Atualize a página.";
   }
 );
 
-// Horário exibido: o que o admin definiu no painel, senão o do config.js
-function labelDe(id) {
-  return ocupacao[id]?.label || EVENTO.horarios.find((h) => h.id === id)?.label || id;
-}
+$("busca").addEventListener("input", (e) => {
+  filtro = norm(e.target.value.trim());
+  render();
+});
 
-// Horários existentes, em ordem de hora
-function idsOrdenados() {
-  return Object.keys(ocupacao).sort((a, b) => labelDe(a).localeCompare(labelDe(b)));
-}
+// ---------- Desenho ----------
+function render() {
+  const todos = classificar(atletas);
+  const lancadas = provasLancadas(atletas);
+  $("status").textContent = lancadas.length
+    ? `Ao vivo · após ${lancadas[lancadas.length - 1].label} · ${todos.length} atletas`
+    : "Aguardando resultados";
 
-function vagasDe(id) {
-  const h = ocupacao[id];
-  if (!h) return null;
-  return Math.max(0, (h.capacidade ?? EVENTO.capacidadePorHorario) - (h.ocupadas ?? 0));
-}
+  const podio = $("podio");
+  const lista = $("lista");
+  podio.innerHTML = "";
+  lista.innerHTML = "";
 
-function renderHorarios() {
-  elHorarios.innerHTML = "";
-  const ids = idsOrdenados();
-  if (!ids.length) {
-    elHorarios.innerHTML = `<p class="muted">Nenhum horário disponível no momento.</p>`;
+  if (todos.length === 0) {
+    lista.appendChild(el("p", "muted small vazio", "Nenhum atleta cadastrado ainda."));
+    return;
   }
-  if (selecionado && !ocupacao[selecionado]) selecionado = null;
-  ids.forEach((id) => {
-    const label = labelDe(id);
-    const vagas = vagasDe(id);
-    const cap = ocupacao[id]?.capacidade ?? EVENTO.capacidadePorHorario;
-    const esgotado = vagas === null || vagas < 2;
-    if (esgotado && selecionado === id) selecionado = null;
 
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "slot" + (selecionado === id ? " selecionado" : "");
-    b.disabled = esgotado;
+  const lider = todos[0].total;
+  const comResultado = todos.filter((a) => a.temResultado);
+  let linhas = todos;
 
-    const pct = vagas === null ? 100 : ((cap - vagas) / cap) * 100;
-    const duplas = Math.floor((vagas ?? 0) / 2);
-    const textoVagas =
-      vagas === null ? "Indisponível"
-      : esgotado ? "Esgotado"
-      : `${duplas} ${duplas === 1 ? "dupla restante" : "duplas restantes"}`;
+  if (filtro) {
+    linhas = todos.filter((a) => norm(a.nome).includes(filtro) || norm(a.box).includes(filtro));
+  } else if (comResultado.length >= 3) {
+    montarPodio(podio, todos.slice(0, 3));
+    linhas = todos.slice(3);
+  }
 
-    b.innerHTML = `
-      <div class="hora">${label}</div>
-      <div class="vagas">${textoVagas}</div>
-      <div class="barra"><span style="width:${pct}%"></span></div>`;
-    b.addEventListener("click", () => {
-      selecionado = id;
-      renderHorarios();
-    });
-    elHorarios.appendChild(b);
+  if (linhas.length === 0) {
+    lista.appendChild(el("p", "muted small vazio", "Nenhum atleta encontrado."));
+    return;
+  }
+  linhas.forEach((a, i) => lista.appendChild(montarLinha(a, lider, i)));
+}
+
+function montarPodio(container, top3) {
+  [top3[1], top3[0], top3[2]].forEach((a, i) => {
+    const col = el("div", "col " + medalha(a.rank));
+    col.style.setProperty("--i", i);
+
+    const p = el("div", "p" + (a === top3[0] ? " m1" : ""));
+    p.append(
+      el("span", "avatar-p", iniciais(a.nome)),
+      el("div", "nm", a.nome)
+    );
+    const tm = el("div", "tm", a.total);
+    tm.appendChild(el("small", "", "pts"));
+    p.appendChild(tm);
+
+    col.append(p, el("div", "base", a.rank));
+    container.appendChild(col);
   });
-  atualizarResumo();
 }
 
-// ---------- Formulário ----------
-const limpar = (s) => s.replace(/\s+/g, " ").trim();
+function montarLinha(a, lider, i) {
+  const r = el("div", "linha");
+  r.style.setProperty("--i", Math.min(i, 12));
 
-function atualizarResumo() {
-  const n1 = limpar(inp1.value);
-  const n2 = limpar(inp2.value);
-  const label = selecionado ? labelDe(selecionado) : null;
-  resumo.textContent = label
-    ? `Horário escolhido: ${label}`
-    : "Selecione um horário acima.";
-  btn.disabled = enviando || !selecionado || n1.length < 3 || n2.length < 3;
+  const n = el("div", "n" + (a.temResultado && a.rank <= 3 ? " " + medalha(a.rank) : ""), a.temResultado ? a.rank : "—");
+  const av = el("span", "avatar-l", iniciais(a.nome));
+
+  const info = el("div", "info");
+  info.appendChild(el("div", "nome", a.nome));
+  if (a.box) info.appendChild(el("div", "box", a.box));
+
+  const prog = el("div", "prog");
+  const fill = document.createElement("span");
+  fill.style.width = (lider > 0 ? Math.round((a.total / lider) * 100) : 0) + "%";
+  prog.appendChild(fill);
+  info.appendChild(prog);
+
+  const chips = el("div", "chips");
+  EVENTO.provas.forEach((p) => {
+    const v = (a.posicoes || {})[p.id];
+    const cls = "chip" + (v === 1 ? " c1" : v === 2 ? " c2" : v === 3 ? " c3" : "");
+    chips.appendChild(el("span", cls, `${p.label} · ${Number.isInteger(v) ? v + "º" : "—"}`));
+  });
+  info.appendChild(chips);
+
+  const pts = el("div", "pts");
+  pts.appendChild(el("div", "t", a.total));
+  if (a.temResultado && a.total < lider) pts.appendChild(el("div", "gap", "−" + (lider - a.total)));
+
+  r.append(n, av, info, pts);
+  return r;
 }
-inp1.addEventListener("input", atualizarResumo);
-inp2.addEventListener("input", atualizarResumo);
-
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  erro.textContent = "";
-
-  const atleta1 = limpar(inp1.value);
-  const atleta2 = limpar(inp2.value);
-  if (!selecionado) return (erro.textContent = "Escolha um horário.");
-  if (atleta1.length < 3 || atleta2.length < 3)
-    return (erro.textContent = "Preencha o nome completo dos dois atletas.");
-  if (atleta1.toLowerCase() === atleta2.toLowerCase())
-    return (erro.textContent = "Os dois atletas precisam ser pessoas diferentes.");
-
-  enviando = true;
-  btn.disabled = true;
-  btn.textContent = "Confirmando…";
-
-  const horarioId = selecionado;
-  const horarioRef = doc(db, "horarios", horarioId);
-  const reservaRef = doc(collection(db, "reservas")); // id gerado
-
-  try {
-    // Transação: garante que duas duplas não peguem a última vaga ao mesmo tempo
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(horarioRef);
-      if (!snap.exists()) throw new Error("HORARIO_INEXISTENTE");
-      const { ocupadas = 0, capacidade } = snap.data();
-      if (ocupadas + 2 > capacidade) throw new Error("LOTADO");
-
-      tx.set(reservaRef, {
-        horario: horarioId,
-        atleta1,
-        atleta2,
-        criadoEm: serverTimestamp()
-      });
-      tx.update(horarioRef, {
-        ocupadas: ocupadas + 2,
-        ultimaReserva: reservaRef.id
-      });
-    });
-
-    const label = labelDe(horarioId);
-    $("conf-texto").innerHTML = "";
-    const p = document.createElement("span");
-    p.textContent = `${atleta1} & ${atleta2} — ${EVENTO.data}, às ${label}.`;
-    $("conf-texto").appendChild(p);
-
-    form.closest(".card").hidden = true;
-    elHorarios.closest(".card").hidden = true;
-    $("confirmacao").hidden = false;
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  } catch (err) {
-    console.error(err);
-    erro.textContent =
-      err.message === "LOTADO"
-        ? "Esse horário acabou de lotar. Escolha outro."
-        : "Não foi possível confirmar. Tente novamente.";
-  } finally {
-    enviando = false;
-    btn.textContent = "Confirmar presença";
-    atualizarResumo();
-  }
-});
-
-$("btn-nova").addEventListener("click", () => {
-  form.reset();
-  selecionado = null;
-  $("confirmacao").hidden = true;
-  form.closest(".card").hidden = false;
-  elHorarios.closest(".card").hidden = false;
-  renderHorarios();
-});
