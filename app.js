@@ -3,7 +3,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { EVENTO } from "./config.js";
-import { classificar, provasLancadas } from "./ranking.js";
+import { classificar, provasLancadas, pontosDe } from "./ranking.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, texto) => {
@@ -92,6 +92,12 @@ function montarPodio(container, top3) {
     col.style.setProperty("--i", i);
 
     const p = el("div", "p" + (a === top3[0] ? " m1" : ""));
+    if (a === top3[0]) {
+      const coroa = el("span", "crown");
+      coroa.innerHTML =
+        '<svg viewBox="0 0 24 18" width="30" height="22" fill="currentColor" aria-hidden="true"><path d="M2 15 1 4l5.5 5L12 1l5.5 8L23 4l-1 11z"/><rect x="2" y="16" width="20" height="2" rx="1"/></svg>';
+      p.appendChild(coroa);
+    }
     p.append(
       el("span", "avatar-p", iniciais(a.nome)),
       el("div", "nm", a.nome)
@@ -125,13 +131,21 @@ function montarLinha(a, lider, i) {
   const chips = el("div", "chips");
   EVENTO.provas.forEach((p) => {
     const v = (a.posicoes || {})[p.id];
+    const lancado = Number.isInteger(v);
     const cls = "chip" + (v === 1 ? " c1" : v === 2 ? " c2" : v === 3 ? " c3" : "");
-    chips.appendChild(el("span", cls, `${p.label} · ${Number.isInteger(v) ? v + "º" : "—"}`));
+    const chip = el("div", cls);
+    chip.append(
+      el("span", "cl", p.label),
+      el("strong", "cp", lancado ? pontosDe(v) : "—"),
+      el("small", "cpos", lancado ? v + "º" : " ")
+    );
+    chips.appendChild(chip);
   });
   info.appendChild(chips);
 
   const pts = el("div", "pts");
   pts.appendChild(el("div", "t", a.total));
+  pts.appendChild(el("div", "u", "pts"));
   if (a.temResultado && a.total < lider) pts.appendChild(el("div", "gap", "−" + (lider - a.total)));
 
   r.append(n, av, info, pts);

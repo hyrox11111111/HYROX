@@ -18,7 +18,7 @@ export const EVENTO = {
   nome: "Campeonato",          // título grande da página
   modalidade: "Crossfit",      // texto pequeno acima do título
   data: "",                    // ex.: "Sábado, 14/11/2026" (deixe "" para esconder)
-  local: "Crosstraining Evolution",  // nome do box/local (deixe "" para esconder)
+  local: "",                   // ex.: "Box Central" (deixe "" para esconder)
 
   // Provas, na ordem em que acontecem. O WOD 3 vale 2 provas (3A e 3B).
   provas: [
