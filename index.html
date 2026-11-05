@@ -22,12 +22,14 @@
 
     <p class="live"><span class="dot"></span><span id="status">Carregando…</span></p>
 
-    <div id="podio" class="pod"></div>
+    <section id="bloco-podio" hidden>
+      <h2 class="sec-titulo">Pódio</h2>
+      <div id="podio" class="podio-cards"></div>
+    </section>
 
-    <section class="card lista-card">
-      <h2 class="titulo-lista">Classificação geral</h2>
+    <section class="card lista-card" id="card-lista">
+      <h2 class="titulo-lista" id="titulo-lista">Classificação geral</h2>
       <input type="search" id="busca" placeholder="Buscar atleta ou box" autocomplete="off" />
-      <div class="hd"><span>Atleta</span><span>Pontos</span></div>
       <div id="lista"></div>
     </section>
 

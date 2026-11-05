@@ -16,19 +16,17 @@ export const firebaseConfig = {
 // 2) Dados do evento
 export const EVENTO = {
   nome: "Campeonato",          // título grande da página
-  modalidade: "Crossfit",      // texto pequeno acima do título
+  modalidade: "",              // texto pequeno acima do título (deixe "" para esconder)
   data: "",                    // ex.: "Sábado, 14/11/2026" (deixe "" para esconder)
   local: "",                   // ex.: "Box Central" (deixe "" para esconder)
 
-  // Provas, na ordem em que acontecem. O WOD 3 vale 2 provas (3A e 3B).
+  // Provas iniciais. Depois é só mexer no painel admin (seção "Provas"):
+  // lá você adiciona, renomeia, reordena e escolhe o tipo de cada uma.
+  // tipo: "tempo" (menor tempo vence) | "reps" (mais repetições vence) | "calorias" (mais calorias vence)
   provas: [
-    { id: "w1",  label: "WOD 1" },
-    { id: "w2",  label: "WOD 2" },
-    { id: "w3a", label: "WOD 3A" },
-    { id: "w3b", label: "WOD 3B" }
-  ],
-
-  // Pontuação: 1º = 100, 2º = 95, 3º = 90...
-  pontosPrimeiro: 100,
-  pontosPorPosicao: 5
+    { id: "w1",  label: "WOD 1",  tipo: "tempo" },
+    { id: "w2",  label: "WOD 2",  tipo: "reps" },
+    { id: "w3a", label: "WOD 3A", tipo: "tempo" },
+    { id: "w3b", label: "WOD 3B", tipo: "calorias" }
+  ]
 };

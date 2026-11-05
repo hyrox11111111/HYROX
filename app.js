@@ -1,9 +1,11 @@
 import {
-  collection, onSnapshot
+  collection, doc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { db } from "./firebase.js";
 import { EVENTO } from "./config.js";
-import { classificar, provasLancadas, pontosDe } from "./ranking.js";
+import {
+  classificar, provasLancadas, normalizarProvas, fmt, fmtResultado
+} from "./ranking.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, texto) => {
@@ -20,20 +22,30 @@ const iniciais = (nome) => {
 const medalha = (rank) => ["ouro", "prata", "bronze"][Math.min(rank, 3) - 1];
 const norm = (s) =>
   String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const num = (x) => Number.isFinite(x);
 
 // ---------- Cabeçalho ----------
-$("modalidade").textContent = EVENTO.modalidade;
+$("modalidade").textContent = EVENTO.modalidade || "";
+$("modalidade").hidden = !EVENTO.modalidade;
 $("nome-evento").textContent = EVENTO.nome.toUpperCase();
 document.title = `Ranking · ${EVENTO.nome}`;
 if (EVENTO.data) { $("data-evento").textContent = EVENTO.data; $("data-evento").hidden = false; }
 if (EVENTO.local) { $("local").textContent = EVENTO.local; $("local").hidden = false; }
-$("regra").textContent =
-  `1º = ${EVENTO.pontosPrimeiro} pts, −${EVENTO.pontosPorPosicao} por posição · pontos somados em ${EVENTO.provas.length} provas`;
 
 let atletas = [];
+let provas = normalizarProvas(null);
 let filtro = "";
 
 // ---------- Dados em tempo real ----------
+onSnapshot(
+  doc(db, "config", "evento"),
+  (snap) => {
+    provas = normalizarProvas(snap.exists() ? snap.data().provas : null);
+    render();
+  },
+  () => { /* sem config: usa as provas padrão */ }
+);
+
 onSnapshot(
   collection(db, "atletas"),
   (snap) => {
@@ -52,16 +64,21 @@ $("busca").addEventListener("input", (e) => {
 
 // ---------- Desenho ----------
 function render() {
-  const todos = classificar(atletas);
-  const lancadas = provasLancadas(atletas);
+  const todos = classificar(atletas, provas);
+  const lancadas = provasLancadas(atletas, provas);
   $("status").textContent = lancadas.length
     ? `Ao vivo · após ${lancadas[lancadas.length - 1].label} · ${todos.length} atletas`
     : "Aguardando resultados";
+  $("regra").textContent =
+    `Pontos somados em ${provas.length} ${provas.length === 1 ? "prova" : "provas"}`;
 
   const podio = $("podio");
   const lista = $("lista");
   podio.innerHTML = "";
   lista.innerHTML = "";
+  $("bloco-podio").hidden = true;
+  $("card-lista").hidden = false;
+  $("titulo-lista").textContent = "Classificação geral";
 
   if (todos.length === 0) {
     lista.appendChild(el("p", "muted small vazio", "Nenhum atleta cadastrado ainda."));
@@ -76,7 +93,10 @@ function render() {
     linhas = todos.filter((a) => norm(a.nome).includes(filtro) || norm(a.box).includes(filtro));
   } else if (comResultado.length >= 3) {
     montarPodio(podio, todos.slice(0, 3));
+    $("bloco-podio").hidden = false;
+    $("titulo-lista").textContent = "Demais atletas";
     linhas = todos.slice(3);
+    if (linhas.length === 0) $("card-lista").hidden = true;
   }
 
   if (linhas.length === 0) {
@@ -86,28 +106,50 @@ function render() {
   linhas.forEach((a, i) => lista.appendChild(montarLinha(a, lider, i)));
 }
 
-function montarPodio(container, top3) {
-  [top3[1], top3[0], top3[2]].forEach((a, i) => {
-    const col = el("div", "col " + medalha(a.rank));
-    col.style.setProperty("--i", i);
+// Um quadradinho por prova: pontos em destaque, resultado e colocação embaixo
+function montarChips(a) {
+  const chips = el("div", "chips");
+  chips.style.setProperty("--n", Math.min(Math.max(provas.length, 1), 4));
+  provas.forEach((p) => {
+    const pt = (a.pontos || {})[p.id];
+    const res = (a.resultados || {})[p.id];
+    const col = (a.colocacao || {})[p.id];
+    const cls = "chip" + (col === 1 ? " c1" : col === 2 ? " c2" : col === 3 ? " c3" : "");
+    const chip = el("div", cls);
+    chip.append(
+      el("span", "cl", p.label),
+      el("strong", "cp", num(pt) ? fmt(pt) : "—"),
+      el("small", "cr", num(res) ? fmtResultado(p.tipo, res) : " "),
+      el("small", "cpos", col ? col + "º" : " ")
+    );
+    chips.appendChild(chip);
+  });
+  return chips;
+}
 
-    const p = el("div", "p" + (a === top3[0] ? " m1" : ""));
-    if (a === top3[0]) {
+// Pódio: um cartão grande por atleta, com o nome completo
+function montarPodio(container, top3) {
+  top3.forEach((a, i) => {
+    const card = el("div", "big " + medalha(a.rank));
+    card.style.setProperty("--i", i);
+
+    if (i === 0) {
       const coroa = el("span", "crown");
       coroa.innerHTML =
-        '<svg viewBox="0 0 24 18" width="30" height="22" fill="currentColor" aria-hidden="true"><path d="M2 15 1 4l5.5 5L12 1l5.5 8L23 4l-1 11z"/><rect x="2" y="16" width="20" height="2" rx="1"/></svg>';
-      p.appendChild(coroa);
+        '<svg viewBox="0 0 24 18" width="32" height="24" fill="currentColor" aria-hidden="true"><path d="M2 15 1 4l5.5 5L12 1l5.5 8L23 4l-1 11z"/><rect x="2" y="16" width="20" height="2" rx="1"/></svg>';
+      card.appendChild(coroa);
     }
-    p.append(
-      el("span", "avatar-p", iniciais(a.nome)),
-      el("div", "nm", a.nome)
-    );
-    const tm = el("div", "tm", a.total);
-    tm.appendChild(el("small", "", "pts"));
-    p.appendChild(tm);
 
-    col.append(p, el("div", "base", a.rank));
-    container.appendChild(col);
+    const topo = el("div", "top");
+    const nomes = el("div", "nmw");
+    nomes.appendChild(el("div", "nm", a.nome));
+    if (a.box) nomes.appendChild(el("div", "bx", a.box));
+    const tot = el("div", "tot");
+    tot.append(el("b", "", fmt(a.total)), el("span", "", "pts"));
+    topo.append(el("span", "badge", a.rank), el("span", "avb", iniciais(a.nome)), nomes, tot);
+
+    card.append(topo, montarChips(a));
+    container.appendChild(card);
   });
 }
 
@@ -124,29 +166,16 @@ function montarLinha(a, lider, i) {
 
   const prog = el("div", "prog");
   const fill = document.createElement("span");
-  fill.style.width = (lider > 0 ? Math.round((a.total / lider) * 100) : 0) + "%";
+  const pct = lider > 0 ? Math.min(100, Math.max(0, Math.round((a.total / lider) * 100))) : 0;
+  fill.style.width = pct + "%";
   prog.appendChild(fill);
   info.appendChild(prog);
-
-  const chips = el("div", "chips");
-  EVENTO.provas.forEach((p) => {
-    const v = (a.posicoes || {})[p.id];
-    const lancado = Number.isInteger(v);
-    const cls = "chip" + (v === 1 ? " c1" : v === 2 ? " c2" : v === 3 ? " c3" : "");
-    const chip = el("div", cls);
-    chip.append(
-      el("span", "cl", p.label),
-      el("strong", "cp", lancado ? pontosDe(v) : "—"),
-      el("small", "cpos", lancado ? v + "º" : " ")
-    );
-    chips.appendChild(chip);
-  });
-  info.appendChild(chips);
+  info.appendChild(montarChips(a));
 
   const pts = el("div", "pts");
-  pts.appendChild(el("div", "t", a.total));
+  pts.appendChild(el("div", "t", fmt(a.total)));
   pts.appendChild(el("div", "u", "pts"));
-  if (a.temResultado && a.total < lider) pts.appendChild(el("div", "gap", "−" + (lider - a.total)));
+  if (a.temResultado && a.total < lider) pts.appendChild(el("div", "gap", "−" + fmt(lider - a.total)));
 
   r.append(n, av, info, pts);
   return r;

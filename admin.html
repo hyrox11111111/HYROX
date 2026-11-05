@@ -14,7 +14,7 @@
 <body>
   <main class="container wide">
     <header class="hero small-hero">
-      <img class="logo" src="logo.png" alt="Crosstraining Evolution" width="120" />
+      <img class="logo" src="logo.png" alt="Logo" width="120" />
       <p class="eyebrow">Painel do organizador</p>
       <h1>ADMIN</h1>
     </header>
@@ -43,9 +43,20 @@
 
       <div class="resumo-admin">
         <div class="stat"><strong id="st-atletas">0</strong><span>Atletas</span></div>
-        <div class="stat"><strong id="st-provas">0/4</strong><span>Provas lançadas</span></div>
+        <div class="stat"><strong id="st-provas">0/0</strong><span>Provas lançadas</span></div>
         <div class="stat"><strong id="st-lider">—</strong><span>Líder</span></div>
       </div>
+
+      <!-- Provas -->
+      <section class="card provas-card">
+        <h2>Provas</h2>
+        <p class="muted small">
+          Escolha como cada prova é medida. <strong>Tempo:</strong> menor tempo fica em 1º.
+          <strong>Repetições</strong> e <strong>calorias:</strong> maior valor fica em 1º.
+        </p>
+        <div id="lista-provas"></div>
+        <button class="btn btn-ghost" id="btn-add-prova" type="button">+ Adicionar prova</button>
+      </section>
 
       <form id="form-novo" class="novo-atleta">
         <input id="novo-nome" placeholder="Nome do atleta" maxlength="80" required />

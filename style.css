@@ -476,6 +476,118 @@ input:focus {
 .chip { background: linear-gradient(180deg, #212125, #18181b); }
 .chip.c1 { background: #25240c; }
 
+/* Ranking v4 — cartões do pódio */
+#bloco-podio { margin-top: 26px; }
+.sec-titulo {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 24px; letter-spacing: 1px; text-transform: uppercase;
+  margin: 0;
+  display: flex; align-items: center; gap: 12px;
+}
+.sec-titulo::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+.podio-cards { display: grid; gap: 14px; margin-top: 16px; }
+
+.big {
+  position: relative;
+  border-radius: 18px;
+  padding: 18px 14px 14px;
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 10px 30px rgba(0, 0, 0, .35);
+  animation: subir .45s ease both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+.big.ouro {
+  background: #25240c;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 230, 0, .14), 0 16px 40px rgba(255, 230, 0, .14);
+}
+.big.prata { border-color: #5a5c60; }
+.big.bronze { border-color: #6a4a2c; }
+.big .crown { position: absolute; right: 16px; top: -14px; margin: 0; width: 32px; }
+.big .top { display: flex; align-items: center; gap: 12px; }
+.big .badge, .big .avb {
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 800; color: #111;
+}
+.big .badge { width: 34px; height: 34px; font-size: 22px; }
+.big .avb { width: 52px; height: 52px; font-size: 24px; }
+.big.ouro .avb { width: 58px; height: 58px; box-shadow: 0 0 0 4px rgba(255, 230, 0, .2), 0 0 28px rgba(255, 230, 0, .35); }
+.ouro .badge, .ouro .avb { background: var(--accent); }
+.prata .badge, .prata .avb { background: #c9ccd1; }
+.bronze .badge, .bronze .avb { background: #d08a4e; }
+.big .nmw { flex: 1; min-width: 0; }
+.big .nm {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 25px; font-weight: 800; line-height: 1.1;
+  text-transform: uppercase; letter-spacing: .5px;
+  overflow-wrap: anywhere;
+}
+.big.ouro .nm { font-size: 28px; }
+.big .bx { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.big .tot { flex-shrink: 0; text-align: right; }
+.big .tot b { display: block; font-family: "Barlow Condensed", sans-serif; font-size: 42px; font-weight: 800; line-height: 1; }
+.big.ouro .tot b { color: var(--accent); font-size: 50px; }
+.big .tot span { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.big .chips { margin-top: 14px; }
+.big .chip .cp { font-size: 24px; }
+
+@media print { .big { background: #fff; border-color: #ccc; box-shadow: none; animation: none; break-inside: avoid; } }
+
+/* Resultados e pontos livres */
+.chips { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); }
+.chip .cr { font-size: 10px; color: #b9b9c0; line-height: 1.2; overflow-wrap: anywhere; text-align: center; min-height: 1.2em; }
+.chip .cp { font-size: 20px; }
+.big .chip .cp { font-size: 24px; }
+.chip .cpos { font-weight: 600; }
+
+select {
+  display: block; width: 100%;
+  padding: 13px 12px;
+  font: inherit; font-size: 15px;
+  color: var(--text);
+  background: #0d0d0f;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255, 230, 0, .18); }
+
+.provas-card { margin-top: 16px; }
+.provas-card h2 { margin-bottom: 6px; }
+.provas-card > p { margin: 0 0 6px; }
+.provas-card .btn-ghost { margin-top: 12px; }
+.prova-edit {
+  display: grid; gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 10px;
+}
+.prova-edit input { margin-top: 0; font-weight: 600; }
+.prova-acoes { display: flex; gap: 8px; align-items: center; }
+.prova-acoes .btn-ghost { margin: 0; padding: 8px 14px; font-size: 18px; line-height: 1; }
+.prova-acoes .btn-ghost:disabled { opacity: .3; cursor: not-allowed; }
+.prova-acoes .btn-excluir { margin-left: auto; padding: 8px 12px; font-size: 13px; }
+
+.provas-lista { margin-top: 4px; }
+.prova-linha {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.pl-topo { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+.pl-nome { font-family: "Barlow Condensed", sans-serif; font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+.pl-tipo { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; }
+.pl-col { margin-left: auto; font-family: "Barlow Condensed", sans-serif; font-size: 22px; font-weight: 800; color: var(--accent); }
+.pl-campo { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.pl-campo input { margin-top: 5px; padding: 10px 12px; font-size: 17px; text-align: center; font-weight: 600; }
+.pl-campo input.ok { border-color: rgba(255, 230, 0, .45); background: #16150a; color: var(--accent); }
+.atleta .toolbar-btns { margin-top: 10px; }
+
+@media print { .provas-card { display: none !important; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
